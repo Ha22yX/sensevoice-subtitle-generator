@@ -146,10 +146,13 @@ def transcribe_media(
             stream.accept_waveform(SAMPLE_RATE, front.samples)
             streams.append(stream)
             vad.pop()
-        for stream in streams:
-            recognizer.decode_stream(stream)
         for seg, stream in zip(segs, streams):
-            text = stream.result.text.strip()
+            try:
+                recognizer.decode_stream(stream)
+                text = stream.result.text.strip()
+            except Exception:
+                # 个别过短或纯噪声的片段可能触发解码异常,跳过该条不影响整体字幕
+                continue
             if text in ("", ".", "The."):
                 continue
             seg.text = text
