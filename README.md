@@ -2,7 +2,7 @@
 
 # 🎬 视频自动字幕生成器
 
-**导入视频 → AI 自动生成带时间轴的字幕(SRT / VTT)**
+**导入视频 → AI 自动生成带时间轴字幕(SRT / VTT),并独家支持 ♿ 无障碍 SDH 字幕(声音与情感标注)**
 
 基于 [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) 多语种语音识别,
 经 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) 在**本地**推理 ——
@@ -24,6 +24,9 @@
 - 🌍 **多语种自动识别**:中文、英语、日语、韩语、粤语等 50+ 语言。
 - 🔒 **完全本地**:音频不离开你的电脑,无需 API Key、无需联网。
 - 📝 **双格式输出**:标准 SRT + WebVTT,兼容几乎所有播放器。
+- ♿ **无障碍 SDH 字幕(独家)**:利用 SenseVoice 的**情感识别 + 音频事件检测**,生成带
+  `[掌声]` `[笑声]` `[背景音乐]` 等声音标注、并按情感着色(ASS)的字幕 ——
+  这是听障人士、内容创作者、语言学习者的刚需,**目前没有同类开源工具**(见下)。
 - 🧩 **零配置依赖**:ffmpeg 由 `imageio-ffmpeg` 自带,无需单独安装。
 - 💻 **跨平台**:Windows / macOS / Linux,默认纯 CPU 即可运行;可选 GPU 加速。
 
@@ -47,6 +50,42 @@
 采用 **VAD 分段 + 段级时间戳** 的方案 —— 这是 sherpa-onnx 官方推荐的稳定做法
 (SenseVoice 在 FunASR 中的原生字级时间戳存在[已知对齐问题](https://github.com/modelsize/FunASR/issues/2324),
 故不采用)。
+
+## ♿ 无障碍 SDH 字幕(独家功能)
+
+SenseVoice 与 Whisper 最大的不同:它**一次调用同时输出 文本 + 语种 + 情感 + 音频事件**
+(Whisper 只输出纯文本)。本工具把这些额外信息映射成 **SDH(Subtitles for Deaf and Hard of Hearing)**
+无障碍字幕 —— 目前**没有其他开源项目**做这件事。
+
+在界面选择 **「字幕模式 → 无障碍 SDH 字幕」**,即可得到:
+
+- **SDH · SRT**:在台词里加入声音与情感标注。
+  ```text
+  1
+  00:00:28,902 --> 00:00:35,676
+  [背景音乐]
+
+  2
+  00:00:28,902 --> 00:00:35,676
+  （开心）朋友们，晚上好，欢迎大家来参加今天晚上的活动，谢谢大家。
+  ```
+- **SDH · ASS**:台词按情感着色(开心=橙、生气=红、难过=蓝、惊讶=黄…),
+  声音标注用斜体副样式。需支持 ASS 的播放器(VLC / PotPlayer / mpv / MPC)才能看到效果。
+  ```text
+  Dialogue: ... Default ... {\c&H000099FF}（开心）朋友们，晚上好…
+  Dialogue: ... Sound  ... [背景音乐]
+  ```
+
+SenseVoice 可识别的标注来源:
+
+| 类型 | 取值 | 字幕里的体现 |
+|------|------|--------------|
+| **音频事件** | 背景音乐 / 掌声 / 笑声 / 哄堂大笑 / 哭声 / 喷嚏声 | `[声音]`,BGM 连续段只标一次 |
+| **情感** | 开心 / 难过 / 激动 / 紧张 / 惊讶 / 厌恶 | SRT 加 `（情感）` 前缀;ASS 着色 |
+| **语种** | zh / en / ja / ko / yue / … | 自动识别(无需手选) |
+
+> 💡 适合场景:为听障观众制作无障碍字幕(SDH)、为视频/播客做内容审核与情绪分析、
+> 语言学习者对照语气、短视频创作者快速定位高光情绪片段。
 
 ## 🚀 快速开始
 
@@ -116,6 +155,7 @@ python app.py
 
 | 选项 | 说明 |
 |------|------|
+| **字幕模式** | `普通字幕`(SRT / VTT)或 `无障碍 SDH`(带声音/情感标注的 SRT + 按情感着色的 ASS),详见上节。 |
 | **模型精度** | `int8`(默认,更快、更小)或 `全量`(略准)。 |
 | **推理线程数** | CPU 推理线程数,默认按 CPU 核数自动取值。 |
 | **GPU 加速** | 勾选后尝试用 CUDA;需自行安装带 CUDA 的 sherpa-onnx(见下),失败自动回退 CPU。 |
@@ -140,8 +180,9 @@ pip uninstall sherpa-onnx
 ├── requirements.txt
 ├── subtitle_gen/          # 核心包
 │   ├── audio.py           # ffmpeg 抽音频 / 探测时长
-│   ├── transcribe.py      # VAD 分段 + SenseVoice 转写
-│   └── subtitles.py       # SRT / VTT 格式化
+│   ├── transcribe.py      # VAD 分段 + SenseVoice 转写(含情感/事件)
+│   ├── subtitles.py       # SRT / VTT 格式化
+│   └── sdh.py             # 无障碍 SDH(SRT + ASS,声音/情感标注)
 ├── models/                # 运行时下载(不入库;项目路径含非 ASCII 时改用用户缓存目录)
 └── outputs/               # 生成的字幕(不入库)
 ```
