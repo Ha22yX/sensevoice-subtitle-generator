@@ -30,15 +30,31 @@ DEFAULT_MAX_SPEECH_DURATION = 5.0
 
 @dataclasses.dataclass
 class Segment:
-    """一条字幕片段。"""
+    """一条字幕片段。
+
+    除文本和时间戳外,SenseVoice 还会输出语种 / 情感 / 音频事件,
+    用于生成无障碍(SDH)字幕。
+    """
 
     start: float           # 起始时间(秒)
     duration: float        # 持续时长(秒)
     text: str = ""         # 识别文本
+    lang: str = ""         # 语种,如 zh / en / ja / ko / yue
+    emotion: str = ""      # 情感,如 HAPPY / SAD / ANGRY / NEUTRAL / EMO_UNKNOWN
+    event: str = ""        # 音频事件,如 Speech / BGM / Applause / Laughter / Cry
 
     @property
     def end(self) -> float:
         return self.start + self.duration
+
+
+# 值得在无障碍字幕里单独标注的非语音声音(BGM 因常伴随语音,另作处理)
+NOTABLE_SOUNDS = {"Applause", "Laughter", "Cry", "Sneeze", "Burst_laughter"}
+
+
+def _strip_tag(s: str) -> str:
+    """去掉 SenseVoice 特殊 token 的 <| ... |> 包裹,如 '<|HAPPY|>' -> 'HAPPY'。"""
+    return s.replace("<|", "").replace("|>", "").strip()
 
 
 def _build_recognizer(
@@ -149,13 +165,19 @@ def transcribe_media(
         for seg, stream in zip(segs, streams):
             try:
                 recognizer.decode_stream(stream)
-                text = stream.result.text.strip()
+                r = stream.result
+                text = r.text.strip()
             except Exception:
                 # 个别过短或纯噪声的片段可能触发解码异常,跳过该条不影响整体字幕
                 continue
-            if text in ("", ".", "The."):
+            event = _strip_tag(getattr(r, "event", ""))
+            emotion = _strip_tag(getattr(r, "emotion", ""))
+            lang = _strip_tag(getattr(r, "lang", ""))
+            has_speech = text not in ("", ".", "The.")
+            # 无语音、且不是值得标注的声音(如纯背景音乐噪声)则跳过
+            if not has_speech and event not in NOTABLE_SOUNDS:
                 continue
-            seg.text = text
+            seg.text, seg.lang, seg.emotion, seg.event = text, lang, emotion, event
             segments.append(seg)
 
         if progress is not None and not is_eof:
