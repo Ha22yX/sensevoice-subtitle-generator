@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Models (downloaded at runtime, large)
+models/
+*.onnx
+*.tar.bz2
+
+# Generated outputs & temp media
+outputs/
+tmp/
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+
+# Gradio runtime
+flagged/
+gradio_cached_examples/
+.cache/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log

@@ -1,0 +1,15 @@
+# 视频自动字幕生成器 — Python 依赖
+# Python 3.10–3.14(已在 3.14 win_amd64 验证可装)
+
+# 推理引擎:sherpa-onnx(内置 SenseVoice 的 ONNX 运行)
+sherpa-onnx>=1.13.3
+
+# 网页界面
+gradio>=4.44.0
+
+# 视频抽音频(自带 ffmpeg 二进制,无需单独安装 ffmpeg)
+imageio-ffmpeg>=0.5.1
+
+# 数值 / 音频读取
+numpy>=1.24
+soundfile>=0.12
