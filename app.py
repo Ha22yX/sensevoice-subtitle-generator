@@ -15,7 +15,11 @@ from pathlib import Path
 import gradio as gr
 
 from download_models import ensure_models, model_paths
-from subtitle_gen import probe_duration, to_srt, to_vtt, transcribe_media
+from subtitle_gen import (
+    probe_duration,
+    to_srt, to_vtt, to_srt_sdh, to_ass,
+    transcribe_media,
+)
 
 # 推理线程数默认值(不超过 4,避免在小机器上反而变慢)
 DEFAULT_THREADS = min(4, max(1, (os.cpu_count() or 4) - 1))
@@ -118,8 +122,8 @@ HERO_HTML = """
 <div class="pills">
   <span class="pill">⚡ SenseVoice</span>
   <span class="pill">🌍 中 · 英 · 日 · 韩 · 粤</span>
+  <span class="pill">♿ 无障碍 SDH</span>
   <span class="pill">🔒 100% 本地</span>
-  <span class="pill">📝 SRT / VTT</span>
   <span class="pill">💚 开源</span>
 </div>
 """
@@ -136,10 +140,17 @@ silero-vad 构建 &nbsp;|&nbsp;
 # --------------------------------------------------------------------------- #
 # 业务逻辑
 # --------------------------------------------------------------------------- #
-def generate(video_path, quality, num_threads, use_gpu, progress=gr.Progress()):
-    """点击"生成字幕"的处理函数。"""
+def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progress()):
+    """点击"生成字幕"的处理函数。
+
+    mode:
+      - 普通字幕:输出 SRT + VTT
+      - 无障碍 SDH:输出带声音/情感标注的 SDH-SRT + 按情感着色的 ASS
+    """
     if not video_path:
         raise gr.Error("请先上传一个视频文件 🎬")
+
+    sdh = "SDH" in str(mode)
 
     # 1) 确保模型就绪(首次会下载,约 1.1GB)
     progress(0.02, desc="检查模型(首次将自动下载,请耐心)…")
@@ -165,7 +176,7 @@ def generate(video_path, quality, num_threads, use_gpu, progress=gr.Progress()):
     def _p(ratio: float, msg: str) -> None:
         progress(0.1 + 0.85 * ratio, desc=msg)
 
-    # 3) 转写
+    # 3) 转写(同时获取 语种 / 情感 / 音频事件)
     progress(0.1, desc="加载模型并识别(首次加载需数秒)…")
     segs = transcribe_media(
         video_path,
@@ -180,25 +191,52 @@ def generate(video_path, quality, num_threads, use_gpu, progress=gr.Progress()):
     if not segs:
         raise gr.Error("未识别到任何语音,请确认视频里有人声。")
 
-    # 4) 生成字幕并落盘
+    # 4) 按模式生成字幕并落盘
     progress(0.96, desc="生成字幕文件…")
-    srt_text = to_srt(segs)
-    vtt_text = to_vtt(segs)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     base = Path(video_path).stem or "subtitle"
-    srt_path = OUTPUT_DIR / f"{base}.srt"
-    vtt_path = OUTPUT_DIR / f"{base}.vtt"
-    srt_path.write_text(srt_text, encoding="utf-8")
-    vtt_path.write_text(vtt_text, encoding="utf-8")
+    if sdh:
+        text1 = to_srt_sdh(segs)
+        text2 = to_ass(segs)
+        ext1, ext2 = "srt", "ass"
+        lab1 = "SDH · SRT 预览(含声音 / 情感标注)"
+        lab2 = "SDH · ASS 预览(按情感着色,需 VLC/PotPlayer/mpv 等)"
+        file_lab1, file_lab2 = "下载 .srt(SDH)", "下载 .ass(SDH)"
+        tab1, tab2 = "SDH · SRT", "SDH · ASS"
+    else:
+        text1 = to_srt(segs)
+        text2 = to_vtt(segs)
+        ext1, ext2 = "srt", "vtt"
+        lab1, lab2 = "SRT 预览", "VTT 预览"
+        file_lab1, file_lab2 = "下载 .srt", "下载 .vtt"
+        tab1, tab2 = "SRT", "VTT"
+
+    f1 = OUTPUT_DIR / f"{base}.{ext1}"
+    f2 = OUTPUT_DIR / f"{base}.{ext2}"
+    f1.write_text(text1, encoding="utf-8")
+    f2.write_text(text2, encoding="utf-8")
 
     progress(1.0, desc="完成 🎉")
     dur_txt = f" · 时长 {total:.0f}s" if total else ""
-    rtf_hint = ""
+    if sdh:
+        n_emo = sum(1 for s in segs if s.emotion and s.emotion not in ("NEUTRAL", "EMO_UNKNOWN"))
+        n_snd = sum(1 for s in segs if s.event and s.event != "Speech")
+        extra = f" · 标注情感 {n_emo} 条、声音 {n_snd} 条"
+    else:
+        extra = ""
     status_md = (
-        f"### ✅ 完成:共 **{len(segs)}** 条字幕{dur_txt}\n\n"
-        f"已生成 **SRT** 与 **VTT**,可在上方标签页预览或下载。\n{rtf_hint}"
+        f"### ✅ 完成:共 **{len(segs)}** 条字幕{dur_txt}{extra}\n\n"
+        f"已生成 **{ext1.upper()}** 与 **{ext2.upper()}**,可在上方标签页预览或下载。"
     )
-    return srt_text, vtt_text, str(srt_path), str(vtt_path), status_md
+    return (
+        gr.update(value=text1, label=lab1),
+        gr.update(value=str(f1), label=file_lab1),
+        gr.update(value=text2, label=lab2),
+        gr.update(value=str(f2), label=file_lab2),
+        gr.update(label=tab1),
+        gr.update(label=tab2),
+        status_md,
+    )
 
 
 def startup_hint() -> str:
@@ -233,6 +271,11 @@ def build_ui() -> gr.Blocks:
             # 右:选项 + 按钮
             with gr.Column(scale=4, min_width=320):
                 gr.Markdown("### ⚙️ 选项")
+                mode = gr.Radio(
+                    choices=["普通字幕 (SRT/VTT)", "无障碍 SDH 字幕 (声音+情感标注)"],
+                    value="普通字幕 (SRT/VTT)",
+                    label="字幕模式",
+                )
                 quality = gr.Radio(
                     choices=["int8(更快·默认)", "全量(略准)"],
                     value="int8(更快·默认)",
@@ -250,25 +293,25 @@ def build_ui() -> gr.Blocks:
                 status = gr.Markdown(startup_hint())
 
         with gr.Tabs():
-            with gr.Tab("SRT 字幕"):
+            with gr.Tab("SRT", id="tab1") as tab1:
                 srt_box = gr.Textbox(
                     label="SRT 预览", lines=14, max_lines=40,
                     elem_classes="srt-preview", interactive=False,
                 )
-                srt_file = gr.File(label="下载 .srt", file_types=[".srt"])
-            with gr.Tab("VTT 字幕"):
+                srt_file = gr.File(label="下载 .srt", file_types=[".srt", ".vtt", ".ass"])
+            with gr.Tab("VTT", id="tab2") as tab2:
                 vtt_box = gr.Textbox(
                     label="VTT 预览", lines=14, max_lines=40,
                     elem_classes="srt-preview", interactive=False,
                 )
-                vtt_file = gr.File(label="下载 .vtt", file_types=[".vtt"])
+                vtt_file = gr.File(label="下载 .vtt", file_types=[".srt", ".vtt", ".ass"])
 
         gr.HTML(FOOTER_HTML, elem_id="foot")
 
         gen_btn.click(
             fn=generate,
-            inputs=[video, quality, threads, use_gpu],
-            outputs=[srt_box, vtt_box, srt_file, vtt_file, status],
+            inputs=[video, mode, quality, threads, use_gpu],
+            outputs=[srt_box, srt_file, vtt_box, vtt_file, tab1, tab2, status],
         )
 
     return demo
