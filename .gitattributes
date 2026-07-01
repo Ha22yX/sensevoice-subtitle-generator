@@ -1,0 +1,20 @@
+# 统一换行符:文本文件用 LF,保证 Windows / macOS / Linux 仓库一致
+* text=auto eol=lf
+
+# Windows 专用脚本保留 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制文件不做转换
+*.onnx binary
+*.tar.bz2 binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.mkv binary
+*.mov binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.icns binary
