@@ -37,12 +37,10 @@ def build_theme() -> gr.themes.Base:
         radius_size="lg",
         text_size="md",
         font=[
-            gr.themes.GoogleFont("Inter"),
-            "ui-sans-serif", "system-ui",
+            "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI",
             "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "sans-serif",
         ],
         font_mono=[
-            gr.themes.GoogleFont("JetBrains Mono"),
             "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace",
         ],
     ).set(
@@ -219,8 +217,8 @@ def startup_hint() -> str:
 # 界面
 # --------------------------------------------------------------------------- #
 def build_ui() -> gr.Blocks:
-    theme = build_theme()
-    with gr.Blocks(theme=theme, css=CSS, title="字幕生成器 · SenseVoice") as demo:
+    # 注意:Gradio 6.0 起 theme / css 从 Blocks() 移到了 launch()
+    with gr.Blocks(title="字幕生成器 · SenseVoice") as demo:
         gr.HTML(HERO_HTML, elem_id="hero")
 
         with gr.Row(equal_height=False):
@@ -255,13 +253,13 @@ def build_ui() -> gr.Blocks:
             with gr.Tab("SRT 字幕"):
                 srt_box = gr.Textbox(
                     label="SRT 预览", lines=14, max_lines=40,
-                    elem_classes="srt-preview", show_copy_button=True, interactive=False,
+                    elem_classes="srt-preview", interactive=False,
                 )
                 srt_file = gr.File(label="下载 .srt", file_types=[".srt"])
             with gr.Tab("VTT 字幕"):
                 vtt_box = gr.Textbox(
                     label="VTT 预览", lines=14, max_lines=40,
-                    elem_classes="srt-preview", show_copy_button=True, interactive=False,
+                    elem_classes="srt-preview", interactive=False,
                 )
                 vtt_file = gr.File(label="下载 .vtt", file_types=[".vtt"])
 
@@ -279,6 +277,8 @@ def build_ui() -> gr.Blocks:
 if __name__ == "__main__":
     app = build_ui()
     app.queue().launch(
+        theme=build_theme(),
+        css=CSS,
         server_name="127.0.0.1",
         server_port=7860,
         inbrowser=True,
