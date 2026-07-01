@@ -16,11 +16,46 @@ from __future__ import annotations
 import os
 import sys
 import tarfile
+import tempfile
 import urllib.request
 from pathlib import Path
 
-# 模型统一存放在项目根目录下的 models/
-MODEL_DIR = Path(__file__).resolve().parent / "models"
+# Windows 中文控制台默认 GBK 编码,打印 emoji 等字符会抛 UnicodeEncodeError。
+# 这里把标准输出/错误流强制为 UTF-8,保证在任意 Windows 控制台都不崩。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def _models_root() -> Path:
+    """返回模型存放目录。
+
+    默认放在项目根目录下的 ``models/``。但 **ONNX Runtime 在 Windows 上对含非
+    ASCII 字符(如中文)的模型路径会加载损坏**,导致解码时抛
+    ``invalid unordered_map key``。因此若默认路径含非 ASCII 字符,自动改用纯 ASCII
+    的用户缓存目录。可用环境变量 ``SUB_MODELS_DIR`` 显式指定任意目录。
+    """
+    env = os.environ.get("SUB_MODELS_DIR")
+    if env:
+        root = Path(env)
+    else:
+        root = Path(__file__).resolve().parent / "models"
+        if not str(root).isascii():
+            if os.name == "nt":
+                base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+            else:
+                base = str(Path.home() / ".cache")
+            root = Path(base) / "subtitle-generator" / "models"
+            if not str(root).isascii():
+                root = Path(tempfile.gettempdir()) / "subtitle-generator" / "models"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+# 模型存放目录(可能位于项目下,也可能位于用户缓存,取决于路径是否为纯 ASCII)
+MODEL_DIR = _models_root()
 
 # SenseVoice(zh/en/ja/ko/yue 多语种)官方 ONNX 导出
 SENSE_NAME = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
