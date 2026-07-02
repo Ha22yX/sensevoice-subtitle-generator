@@ -39,3 +39,45 @@ def to_vtt(segments: list[Segment]) -> str:
         lines.append(seg.text.strip())
         lines.append("")
     return "\n".join(lines).strip() + "\n"
+
+
+def refine_segments(
+    segments: list[Segment],
+    *,
+    merge_gap: float = 0.6,
+    max_duration: float = 7.0,
+    max_chars: int = 84,
+) -> list[Segment]:
+    """温和地整理片段,提升可读性(语言无关、不改时间戳来源)。
+
+    规则:相邻两段间隔 ≤ merge_gap 秒、合并后总时长 ≤ max_duration、
+    合并后字符数 ≤ max_chars、且语种相同 → 合并为一条。
+    适合把 VAD 切得过碎的短碎片合并成更自然的整句。
+    """
+    if not segments:
+        return []
+    out: list[Segment] = [
+        Segment(s.start, s.duration, s.text, s.lang, s.emotion, s.event) for s in segments
+    ]
+    merged = [out[0]]
+    for cur in out[1:]:
+        prev = merged[-1]
+        gap = cur.start - prev.end
+        joined_chars = len(prev.text) + len(cur.text) + (1 if prev.text and cur.text else 0)
+        same_lang = (not prev.lang or not cur.lang) or prev.lang == cur.lang
+        if (
+            gap <= merge_gap
+            and (cur.end - prev.start) <= max_duration
+            and joined_chars <= max_chars
+            and same_lang
+        ):
+            prev.duration = cur.end - prev.start
+            prev.text = (prev.text + ("\n" if prev.text and cur.text else "") + cur.text).strip()
+            # 合并后情感/事件若不一致则置空,避免给合并句误标
+            if prev.emotion != cur.emotion:
+                prev.emotion = ""
+            if prev.event != cur.event:
+                prev.event = ""
+        else:
+            merged.append(cur)
+    return merged
