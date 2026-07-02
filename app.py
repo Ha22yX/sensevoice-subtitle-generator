@@ -18,6 +18,7 @@ from download_models import ensure_models, model_paths
 from subtitle_gen import (
     probe_duration,
     to_srt, to_vtt, to_srt_sdh, to_ass,
+    refine_segments, burn_subtitles,
     transcribe_media,
 )
 
@@ -140,12 +141,13 @@ silero-vad 构建 &nbsp;|&nbsp;
 # --------------------------------------------------------------------------- #
 # 业务逻辑
 # --------------------------------------------------------------------------- #
-def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progress()):
+def generate(video_path, mode, quality, num_threads, use_gpu, burn, progress=gr.Progress()):
     """点击"生成字幕"的处理函数。
 
     mode:
       - 普通字幕:输出 SRT + VTT
       - 无障碍 SDH:输出带声音/情感标注的 SDH-SRT + 按情感着色的 ASS
+    burn:为 True 时,额外把字幕烧录进视频,输出一个带字幕的 MP4。
     """
     if not video_path:
         raise gr.Error("请先上传一个视频文件 🎬")
@@ -191,8 +193,11 @@ def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progre
     if not segs:
         raise gr.Error("未识别到任何语音,请确认视频里有人声。")
 
+    # 3.5) 整理过短的相邻碎片,提升可读性
+    segs = refine_segments(segs)
+
     # 4) 按模式生成字幕并落盘
-    progress(0.96, desc="生成字幕文件…")
+    progress(0.93, desc="生成字幕文件…")
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     base = Path(video_path).stem or "subtitle"
     if sdh:
@@ -216,6 +221,19 @@ def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progre
     f1.write_text(text1, encoding="utf-8")
     f2.write_text(text2, encoding="utf-8")
 
+    # 5) 可选:把字幕烧录进视频(SDH 模式烧 ASS,情感着色一并保留)
+    burned_video = None
+    burn_note = ""
+    if burn:
+        progress(0.96, desc="烧录字幕到视频(需重新编码,稍候)…")
+        sub_to_burn = f2 if sdh else f1
+        out_mp4 = OUTPUT_DIR / f"{base}_subtitled.mp4"
+        try:
+            burned_video = burn_subtitles(video_path, sub_to_burn, out_mp4)
+            burn_note = f"\n\n🎬 已烧录字幕到视频:**{base}_subtitled.mp4**(可在下方预览/下载)。"
+        except Exception as e:  # noqa: BLE001
+            burn_note = f"\n\n⚠️ 烧录失败:{e}"
+
     progress(1.0, desc="完成 🎉")
     dur_txt = f" · 时长 {total:.0f}s" if total else ""
     if sdh:
@@ -226,7 +244,7 @@ def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progre
         extra = ""
     status_md = (
         f"### ✅ 完成:共 **{len(segs)}** 条字幕{dur_txt}{extra}\n\n"
-        f"已生成 **{ext1.upper()}** 与 **{ext2.upper()}**,可在上方标签页预览或下载。"
+        f"已生成 **{ext1.upper()}** 与 **{ext2.upper()}**,可在上方标签页预览或下载。{burn_note}"
     )
     return (
         gr.update(value=text1, label=lab1),
@@ -236,6 +254,7 @@ def generate(video_path, mode, quality, num_threads, use_gpu, progress=gr.Progre
         gr.update(label=tab1),
         gr.update(label=tab2),
         status_md,
+        gr.update(value=burned_video, visible=bool(burn and burned_video)),
     )
 
 
@@ -289,6 +308,10 @@ def build_ui() -> gr.Blocks:
                     value=False,
                     label="GPU 加速(需自行安装 CUDA 版 sherpa-onnx)",
                 )
+                burn = gr.Checkbox(
+                    value=False,
+                    label="🔥 烧录字幕到视频(额外输出带字幕的 MP4,较慢)",
+                )
                 gen_btn = gr.Button("✨ 生成字幕", variant="primary", size="lg")
                 status = gr.Markdown(startup_hint())
 
@@ -306,12 +329,14 @@ def build_ui() -> gr.Blocks:
                 )
                 vtt_file = gr.File(label="下载 .vtt", file_types=[".srt", ".vtt", ".ass"])
 
+        burned_video = gr.Video(label="带字幕的视频(烧录后)", visible=False, interactive=False)
+
         gr.HTML(FOOTER_HTML, elem_id="foot")
 
         gen_btn.click(
             fn=generate,
-            inputs=[video, mode, quality, threads, use_gpu],
-            outputs=[srt_box, srt_file, vtt_box, vtt_file, tab1, tab2, status],
+            inputs=[video, mode, quality, threads, use_gpu, burn],
+            outputs=[srt_box, srt_file, vtt_box, vtt_file, tab1, tab2, status, burned_video],
         )
 
     return demo
