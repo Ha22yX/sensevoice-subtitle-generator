@@ -1,4 +1,4 @@
-"""字幕生成器核心包:视频 → 带时间轴字幕(SRT/VTT/SDH/ASS)+ 烧录。"""
+"""Core subtitle generation package."""
 
 from .audio import extract_audio, probe_duration, get_ffmpeg_exe
 from .subtitles import to_srt, to_vtt, refine_segments

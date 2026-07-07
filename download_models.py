@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""首次运行下载 SenseVoice 与 silero-vad 模型到 ./models/。
+"""Download the SenseVoice and silero-vad model files used by the app.
 
-主源为 k2-fsa GitHub releases(官方示例同源)。国内若下载缓慢/失败,可设置
-环境变量 SUB_MODELS_BASE 指向任意托管了相同文件名的镜像,例如:
+The default source is the k2-fsa GitHub release used by the sherpa-onnx
+examples. If downloads are slow or blocked, set SUB_MODELS_BASE to a mirror that
+serves the same filenames:
 
-    # Windows PowerShell
     $env:SUB_MODELS_BASE = "https://your-mirror.example/asr-models"
     python download_models.py
 
-模型不会被打包进 git(体积大),由本脚本在运行时下载。
-直接运行 `python download_models.py` 即可。
+Model files are not stored in git because they are large. Run this script once
+before launching the UI, or let the app download models on first use.
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
-# Windows 中文控制台默认 GBK 编码,打印 emoji 等字符会抛 UnicodeEncodeError。
-# 这里把标准输出/错误流强制为 UTF-8,保证在任意 Windows 控制台都不崩。
+# Some Windows terminals still default to legacy encodings. Force UTF-8 output
+# so status messages do not crash when paths or filenames contain Unicode.
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8", errors="replace")
@@ -30,12 +30,12 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 def _models_root() -> Path:
-    """返回模型存放目录。
+    """Return the directory used for downloaded model files.
 
-    默认放在项目根目录下的 ``models/``。但 **ONNX Runtime 在 Windows 上对含非
-    ASCII 字符(如中文)的模型路径会加载损坏**,导致解码时抛
-    ``invalid unordered_map key``。因此若默认路径含非 ASCII 字符,自动改用纯 ASCII
-    的用户缓存目录。可用环境变量 ``SUB_MODELS_DIR`` 显式指定任意目录。
+    The default is ``models/`` inside the repository. On Windows, ONNX Runtime
+    can fail when model paths contain non-ASCII characters. If the repository
+    path is not ASCII-only, fall back to a user cache directory. ``SUB_MODELS_DIR``
+    can be used to choose a custom directory.
     """
     env = os.environ.get("SUB_MODELS_DIR")
     if env:
@@ -54,20 +54,20 @@ def _models_root() -> Path:
     return root
 
 
-# 模型存放目录(可能位于项目下,也可能位于用户缓存,取决于路径是否为纯 ASCII)
+# Model directory. This may be inside the repo or in the user cache.
 MODEL_DIR = _models_root()
 
-# SenseVoice(zh/en/ja/ko/yue 多语种)官方 ONNX 导出
+# SenseVoice ONNX export used by sherpa-onnx.
 SENSE_NAME = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
 SENSE_TARBALL = f"{SENSE_NAME}.tar.bz2"
 VAD_NAME = "silero_vad.onnx"
 
-# 官方发布源(可被环境变量 SUB_MODELS_BASE 覆盖)
+# Default model source. Can be overridden with SUB_MODELS_BASE.
 DEFAULT_BASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
 
 
 def model_paths() -> dict[str, Path]:
-    """返回各模型文件的期望路径(可能尚不存在)。"""
+    """Return expected model paths. Files may not exist yet."""
     sense_dir = MODEL_DIR / SENSE_NAME
     return {
         "sense_dir": sense_dir,

@@ -1,140 +1,114 @@
-<div align="center">
+# SenseVoice Subtitle Generator
 
-# 🎬 SenseVoice Subtitle Generator
+A local subtitle generator for video and audio files. It uses SenseVoice through
+`sherpa-onnx` to create timed subtitles, with optional SDH-style sound and
+emotion annotations.
 
-**Drop in a video → AI generates timed subtitles (SRT / VTT) — with an exclusive ♿ accessibility (SDH) mode that annotates sounds & emotions.**
-
-[English](README.md) · [中文](README.zh-CN.md)
-
-Powered by [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) multilingual speech recognition, running **locally** via
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — no internet, no API key. Auto-detects Chinese / English / Japanese / Korean / Cantonese and 50+ languages.
+[中文说明](README.zh-CN.md)
 
 ![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/Code-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
-![Engine](https://img.shields.io/badge/engine-sherpa--onnx%20%2B%20SenseVoice-indigo)
 
-</div>
+## What It Does
 
----
+- Generates `.srt` and `.vtt` subtitles from video or audio files.
+- Runs locally. No cloud API key is required after the models are downloaded.
+- Uses SenseVoice for multilingual speech recognition.
+- Supports normal subtitles and an SDH mode with sound/emotion labels when the
+  model returns those signals.
+- Can produce `.ass` subtitles and optionally burn subtitles into an `.mp4`.
+- Uses `imageio-ffmpeg`, so a separate ffmpeg install is usually not needed.
 
-## ✨ Features
-
-- 🎞️ **Drag & drop** — upload a video in the browser, get subtitles in one click.
-- ⚡ **Fast & accurate** — SenseVoice is non-autoregressive, ~10× faster than Whisper.
-- 🌍 **Multilingual auto-detect** — Chinese, English, Japanese, Korean, Cantonese, 50+ languages.
-- 🔒 **100% local** — audio never leaves your machine; no API key, no network.
-- 📝 **Standard formats** — SRT + WebVTT, compatible with virtually every player.
-- ♿ **Accessibility SDH subtitles (exclusive)** — uses SenseVoice's **emotion recognition + audio-event
-  detection** to produce subtitles annotated with `[Applause]` `[Laughter]` `[Background Music]` and
-  colored by emotion (ASS). A genuine need for deaf/hard-of-hearing viewers, content creators, and
-  language learners — **no other open-source tool does this** (see below).
-- 🔥 **Burn subtitles into video** — optionally render styled subtitles (including SDH emotion colors)
-  directly into an MP4, ready to share.
-- 🧩 **Zero-config deps** — ffmpeg is bundled via `imageio-ffmpeg`, no separate install.
-- 💻 **Cross-platform** — Windows / macOS / Linux; runs on CPU by default, optional GPU.
-
-## 🖼️ Screenshots
+## Screenshots
 
 ![Interface](docs/ui.png)
 
-![SDH subtitles burned into video — emotion-colored text + sound tags](docs/sdh_demo.png)
+![SDH subtitles burned into video](docs/sdh_demo.png)
 
-> Above: SDH subtitles burned into the video. The happy greeting is rendered in **orange**, with a
-> `[背景音乐]` (Background Music) sound tag.
+## How It Works
 
-## ♿ Accessibility SDH subtitles (exclusive)
+The pipeline is intentionally simple:
 
-SenseVoice differs from Whisper in one key way: a **single call returns text + language + emotion +
-audio event** (Whisper returns text only). This tool maps those extra signals into **SDH**
-(Subtitles for Deaf and Hard of Hearing) subtitles — **no other open-source project does this today.**
-
-Select **"Subtitle mode → Accessibility SDH"** in the UI to get:
-
-- **SDH · SRT** — speech lines augmented with sound & emotion tags:
-  ```text
-  1
-  00:00:28,902 --> 00:00:35,676
-  [背景音乐]
-
-  2
-  00:00:28,902 --> 00:00:35,676
-  （开心）朋友们，晚上好，欢迎大家来参加今天晚上的活动，谢谢大家。
-  ```
-- **SDH · ASS** — speech **colored by emotion** (happy=orange, angry=red, sad=blue, surprised=yellow…),
-  with sound tags in an italic secondary style. Needs an ASS-capable player (VLC / PotPlayer / mpv / MPC).
-
-What SenseVoice detects and how it maps:
-
-| Signal | Values | In the subtitle |
-|---|---|---|
-| **Audio event** | BGM / Applause / Laughter / Burst laughter / Cry / Sneeze | `[sound]`; BGM shown once per run |
-| **Emotion** | Happy / Sad / Angry / Tense / Surprised / Disgusted | `（emotion）` prefix in SRT; color in ASS |
-| **Language** | zh / en / ja / ko / yue / … | auto-detected (no manual pick) |
-
-> 💡 Great for: making videos accessible (SDH) for deaf viewers, podcast/video content review with
-> sentiment, language-learners matching tone, short-video creators spotting emotional highlights.
-
-## 🛠️ How it works
-
-```
-video ──(ffmpeg → 16 kHz mono PCM)──► silero-vad segmentation
-        └── per segment ► SenseVoice decode ► text + lang + emotion + event + segment timestamps
-                                                        │
-                                  ┌─────────────────────┴─────────────────────┐
-                                  ▼                                           ▼
-                        SRT / VTT                                  SDH SRT / emotion-colored ASS
-                                                                      │
-                                                              (optional) burn into MP4
+```text
+media file
+  -> ffmpeg extracts 16 kHz mono audio
+  -> silero-vad splits the audio into speech segments
+  -> SenseVoice decodes each segment
+  -> the app writes SRT, VTT, and optional SDH/ASS outputs
 ```
 
-We use **VAD segmentation + segment-level timestamps** — the stable, officially-recommended approach
-(SenseVoice's native word-level timestamps in FunASR have a [known alignment issue](https://github.com/modelsize/FunASR/issues/2324),
-so they're avoided here).
+The project uses segment-level timestamps. That is less granular than word-level
+timing, but it is stable enough for normal subtitle files and avoids known
+alignment issues in some SenseVoice timestamp workflows.
 
-## 🚀 Quick start
+## SDH Mode
+
+SenseVoice can return more than text for some segments, including language,
+emotion, and audio-event tags. SDH mode uses those extra fields to produce:
+
+- SDH-flavored SRT with labels such as `[Background music]` or emotion prefixes.
+- ASS subtitles with simple emotion-based styling.
+- Optional burned-in MP4 output using the generated subtitle file.
+
+This is useful for accessibility review, content editing, and videos where
+non-speech sound cues matter. The labels are model predictions, so they should be
+reviewed before publishing important or public-facing work.
+
+## Quick Start
 
 ### 1. Install
 
-Requires **Python 3.10 – 3.14** (verified on Windows / 3.14).
+Python 3.10 or newer is recommended.
 
 ```bash
 git clone https://github.com/Ha22yX/sensevoice-subtitle-generator.git
 cd sensevoice-subtitle-generator
 
 python -m venv .venv
-# Windows:
+
+# Windows
 .venv\Scripts\activate
-# macOS / Linux:
+
+# macOS / Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
 
-### 2. Download models (first run, ~1.1 GB)
+### 2. Download Models
+
+The first run needs about 1.1 GB of model files.
 
 ```bash
 python download_models.py
 ```
 
-Models are stored on an **ASCII-only path** (chosen automatically):
+The downloader chooses a safe model directory automatically:
 
-- If the project path is ASCII → `models/` inside the project.
-- Otherwise (e.g. project inside a Chinese-named folder) → a user cache dir:
-  - Windows: `%LOCALAPPDATA%\subtitle-generator\models`
-  - macOS / Linux: `~/.cache/subtitle-generator/models`
+- If the repository path is ASCII-only, models are stored in `models/`.
+- If the path contains non-ASCII characters, models are stored in a user cache
+  directory instead.
 
-> ⚠️ **Why?** ONNX Runtime on Windows **corrupts model loading for paths containing non-ASCII
-> characters** (e.g. Chinese), causing an `invalid unordered_map key` error at decode time. This
-> project detects and avoids that automatically. To set a custom location, use the `SUB_MODELS_DIR`
-> environment variable (must be an ASCII path).
+Default cache paths:
 
-**Slow / failing downloads?** Point `SUB_MODELS_BASE` at a mirror:
+```text
+Windows:      %LOCALAPPDATA%\subtitle-generator\models
+macOS/Linux:  ~/.cache/subtitle-generator/models
+```
 
-```bash
+You can override the model directory with `SUB_MODELS_DIR`. On Windows, use an
+ASCII-only path to avoid ONNX Runtime model-loading errors.
+
+If downloads are slow, point `SUB_MODELS_BASE` to a mirror:
+
+```powershell
 # Windows PowerShell
 $env:SUB_MODELS_BASE = "https://your-mirror/asr-models"
 python download_models.py
+```
+
+```bash
 # macOS / Linux
 export SUB_MODELS_BASE="https://your-mirror/asr-models"
 python download_models.py
@@ -146,101 +120,92 @@ python download_models.py
 python app.py
 ```
 
-Your browser opens <http://127.0.0.1:7860>. Upload a video → pick options → click **Generate** →
-preview and download in the SRT / VTT (or SDH) tabs.
+Open <http://127.0.0.1:7860>, upload a file, choose the options you need, and
+generate subtitles.
 
-> 💡 You can **skip step 2** — the first click of "Generate" auto-downloads the models.
+The app can also download models automatically the first time you generate
+subtitles, but running `download_models.py` first makes setup failures easier to
+diagnose.
 
-## ⚙️ Options
+## Options
 
 | Option | Description |
-|---|---|
-| **Subtitle mode** | `Normal` (SRT / VTT) or `Accessibility SDH` (sound/emotion-tagged SRT + emotion-colored ASS). |
-| **Model precision** | `int8` (default, faster & smaller) or `full` (slightly more accurate). |
-| **Inference threads** | CPU threads; auto-set from CPU cores by default. |
-| **GPU acceleration** | Attempts CUDA; requires a CUDA build of sherpa-onnx (see below). Falls back to CPU on failure. |
-| **Burn into video** | Renders the generated subtitles directly into an output MP4 (slower, since it re-encodes). |
+| --- | --- |
+| Subtitle mode | Normal SRT/VTT or SDH output with sound/emotion annotations. |
+| Model precision | `int8` for smaller/faster inference, or `full` for higher precision. |
+| Inference threads | CPU thread count. Auto is usually fine. |
+| GPU acceleration | Attempts CUDA if a compatible `sherpa-onnx` build is installed. |
+| Burn into video | Renders subtitles into a new MP4. This re-encodes the video. |
 
-### Optional: GPU acceleration (CUDA)
+## Optional CUDA Setup
 
-The default `sherpa-onnx` is CPU-only and runs everywhere. If you have an NVIDIA GPU and want a
-speedup, install a CUDA build of sherpa-onnx and tick "GPU acceleration" (the code auto-detects and
-falls back to CPU if unavailable):
+The default `sherpa-onnx` package is CPU-only. To try GPU inference, install a
+CUDA build that matches your environment, then enable GPU acceleration in the UI.
+If CUDA is not available, the app falls back to CPU.
 
 ```bash
 pip uninstall sherpa-onnx
-# Install the CUDA build matching your CUDA version per the official docs:
+# Then install the CUDA build from the official sherpa-onnx instructions:
 # https://k2-fsa.github.io/sherpa/onnx/install/index.html
 ```
 
-## 📁 Project structure
+## Project Layout
 
-```
+```text
 .
-├── app.py                 # Gradio web UI entry point
-├── download_models.py     # model downloader (first run)
+├── app.py                 # Gradio UI
+├── download_models.py     # model downloader
 ├── requirements.txt
-├── subtitle_gen/          # core package
-│   ├── audio.py           # ffmpeg audio extraction / duration probe
-│   ├── transcribe.py      # VAD segmentation + SenseVoice (text/lang/emotion/event)
-│   ├── subtitles.py       # SRT / VTT formatting + segment refinement
-│   ├── sdh.py             # accessibility SDH (SRT + ASS with sound/emotion)
-│   └── burn.py            # burn subtitles into video (libass)
+├── subtitle_gen/          # subtitle generation package
+│   ├── audio.py           # ffmpeg audio extraction and duration probing
+│   ├── transcribe.py      # VAD segmentation and SenseVoice decoding
+│   ├── subtitles.py       # SRT/VTT formatting and segment cleanup
+│   ├── sdh.py             # SDH SRT and ASS formatting
+│   └── burn.py            # subtitle burn-in with ffmpeg/libass
 ├── docs/                  # screenshots
-├── models/                # downloaded at runtime (not in repo; user cache if path is non-ASCII)
-└── outputs/               # generated subtitles (not in repo)
+├── models/                # downloaded at runtime, ignored by git
+└── outputs/               # generated files, ignored by git
 ```
 
-## 🧰 Tech stack
+## Troubleshooting
 
-- **[SenseVoice](https://github.com/FunAudioLLM/SenseVoice)** (FunAudioLLM) — multilingual ASR + emotion + event detection
-- **[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)** (k2-fsa) — Next-gen Kaldi ONNX runtime
-- **[silero-vad](https://github.com/snakers4/silero-vad)** — voice activity detection
-- **[Gradio](https://gradio.app)** — web interface
-- **[imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)** — bundled ffmpeg binary
+**Model load error: `invalid unordered_map key`**
 
-## ❓ FAQ
+On Windows, ONNX Runtime can fail when model files are loaded from a path with
+non-ASCII characters. Move the project to an ASCII-only path or set
+`SUB_MODELS_DIR` to an ASCII-only directory, then run `python download_models.py`
+again.
 
-**Q: Why are timestamps per-segment rather than per-word?**
-A: We use VAD segmentation for stable, reliable segment-level timestamps — enough for the vast
-majority of subtitle use cases. Per-word (karaoke-style) is a possible future enhancement.
+**ffmpeg error**
 
-**Q: No punctuation / wrong punctuation?**
-A: SenseVoice runs inverse text normalization (ITN), so it adds punctuation and normalizes numbers
-automatically.
+The project uses `imageio-ffmpeg`, which usually provides ffmpeg automatically.
+Reinstall dependencies if ffmpeg is missing:
 
-**Q: "ffmpeg not found"?**
-A: Won't happen — ffmpeg is bundled via `imageio-ffmpeg` at `pip install` time. If it still errors,
-make sure `requirements.txt` is fully installed.
+```bash
+pip install -r requirements.txt
+```
 
-**Q: `invalid unordered_map key` or model load failure?**
-A: This is the known ONNX Runtime issue with **non-ASCII (e.g. Chinese) model paths** on Windows. The
-tool already places models on an ASCII path. If it persists, set `SUB_MODELS_DIR` to an ASCII
-directory and re-run `python download_models.py`.
+**Timestamps are not word-level**
 
-**Q: Does it work on audio files?**
-A: The UI is video-oriented, but the underlying pipeline is ffmpeg-based, so audio files work too
-(you can call `subtitle_gen` directly).
+This project currently writes segment-level subtitles. Word-level or
+karaoke-style timing would need a separate alignment step.
 
-## 🤝 Contributing
+**Audio-only files**
 
-Issues and PRs welcome! Ideas: per-word timestamps, batch processing, more subtitle styles, a CLI.
+The UI is video-oriented, but the pipeline is ffmpeg-based and can handle many
+audio formats as input.
 
-## 📄 License
+## License
 
-- **This project's code**: [MIT License](./LICENSE).
-- **Models**: this project does **not** bundle or redistribute models — they're downloaded at runtime
-  and remain under their own licenses, which you must comply with:
-  [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) ·
-  [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) ·
-  [silero-vad](https://github.com/snakers4/silero-vad).
+The project code is released under the [MIT License](LICENSE).
 
-## 🙏 Acknowledgements
+Models are downloaded at runtime and remain under their own licenses. Check the
+upstream projects before redistributing model files:
 
-Thanks to the above open-source projects for making this possible.
+- [SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+- [silero-vad](https://github.com/snakers4/silero-vad)
 
-<div align="center">
+## Acknowledgements
 
-If this project helps you, a ⭐ Star is appreciated!
-
-</div>
+Built on SenseVoice, sherpa-onnx, silero-vad, Gradio, and imageio-ffmpeg.

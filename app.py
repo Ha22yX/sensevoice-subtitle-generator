@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""视频自动字幕生成器 —— Gradio 网页界面。
+"""Gradio web interface for local subtitle generation.
 
-导入视频 → silero-vad 分段 → SenseVoice 识别 → 生成带时间轴的 SRT / VTT。
+Pipeline: media input -> silero-vad segmentation -> SenseVoice recognition ->
+timed subtitle files.
 
-运行:
+Run:
     python app.py
-然后浏览器打开 http://127.0.0.1:7860
+Then open http://127.0.0.1:7860.
 """
 from __future__ import annotations
 
@@ -22,19 +23,18 @@ from subtitle_gen import (
     transcribe_media,
 )
 
-# 推理线程数默认值(不超过 4,避免在小机器上反而变慢)
+# Default CPU thread count. Keep it modest so small machines do not slow down.
 DEFAULT_THREADS = min(4, max(1, (os.cpu_count() or 4) - 1))
 
-# GitHub 仓库地址(创建后填入;README 链接也用这个)
 REPO_URL = "https://github.com/Ha22yX/sensevoice-subtitle-generator"
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
 
 # --------------------------------------------------------------------------- #
-# 主题与样式
+# Theme and styling
 # --------------------------------------------------------------------------- #
 def build_theme() -> gr.themes.Base:
-    """靛蓝强调色 + 柔和圆角 + 系统字体(离线自动回退)。"""
+    """Build the Gradio theme used by the app."""
     return gr.themes.Soft(
         primary_hue="indigo",
         secondary_hue="slate",
