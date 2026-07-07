@@ -1,4 +1,4 @@
-# Python
+# Python cache and build artifacts.
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,17 +6,17 @@ __pycache__/
 build/
 dist/
 
-# Virtual environments
+# Virtual environments.
 .venv/
 venv/
 env/
 
-# Models (downloaded at runtime, large)
+# Models are downloaded at runtime and are too large for git.
 models/
 *.onnx
 *.tar.bz2
 
-# Generated outputs & temp media
+# Generated outputs and temporary media.
 outputs/
 tmp/
 *.wav
@@ -30,12 +30,12 @@ tmp/
 *.avi
 *.webm
 
-# Gradio runtime
+# Gradio runtime files.
 flagged/
 gradio_cached_examples/
 .cache/
 
-# OS / IDE
+# OS and editor files.
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -44,5 +44,5 @@ desktop.ini
 *.swp
 *.swo
 
-# Logs
+# Logs.
 *.log
