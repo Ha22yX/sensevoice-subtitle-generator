@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Ha22yX
+Copyright (c) 2026 Zhiyuan Xing
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,19 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-----------------------------------------------------------------------
-
-NOTE ON MODEL LICENSES
-
-This project's source code is released under the MIT License above.
-
-The speech recognition models it downloads at runtime are NOT covered by
-this license and are NOT redistributed by this project. They retain their
-original licenses — please review and comply with them:
-
-- SenseVoice (FunAudioLLM): https://github.com/FunAudioLLM/SenseVoice
-- sherpa-onnx model export (k2-fsa): https://github.com/k2-fsa/sherpa-onnx
-- silero-vad: https://github.com/snakers4/silero-vad
-
-By using this tool you agree to the terms of those model licenses.
