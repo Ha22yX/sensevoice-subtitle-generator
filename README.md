@@ -22,9 +22,29 @@
   <img src=".github/assets/readme-hero.svg" alt="SenseVoice Subtitle Generator overview image" width="100%" />
 </p>
 
+<p align="center">
+  <img src="docs/ui.png" alt="SenseVoice Subtitle Generator interface screenshot" width="49%" />
+  <img src="docs/sdh_demo.png" alt="SDH subtitle output screenshot" width="49%" />
+</p>
+
 ## Why This Exists
 
-Subtitle generation should be usable without sending every file to a cloud API. This app downloads local models once, then produces subtitles and optional SDH-style outputs from a simple Gradio UI.
+Subtitle generation should be usable without sending every media file to a cloud API. This app downloads local models once, then produces normal and SDH-style subtitle outputs from a Gradio UI.
+
+## Workflow
+
+- Upload an audio or video file.
+- Extract 16 kHz mono audio through the bundled ffmpeg path.
+- Split speech with VAD and transcribe segments with SenseVoice.
+- Write SRT/VTT outputs and optional SDH/ASS outputs.
+- Optionally burn subtitles into an MP4 for review.
+
+## Features
+
+- Generate SRT and VTT from media files.
+- Runs locally after model download; no cloud API key required.
+- Optional SDH labels and ASS/burn-in subtitle path.
+- Gradio UI with practical model path and ffmpeg handling.
 
 ## Quickstart
 
@@ -40,13 +60,6 @@ python app.py
 
 Open `http://127.0.0.1:7860`. The first model download is about 1.1 GB.
 
-## Features
-
-- Generate SRT and VTT from audio/video files.
-- Runs locally after model download; no cloud API key required.
-- Optional SDH-style labels and ASS/burn-in subtitle path.
-- Gradio UI with practical model path and ffmpeg handling.
-
 ## Tech Stack
 
 | Layer | Technology | Role |
@@ -56,11 +69,19 @@ Open `http://127.0.0.1:7860`. The first model download is about 1.1 GB.
 | UI | Gradio | Upload files and export subtitles. |
 | Output | SRT, VTT, ASS, MP4 burn-in | Subtitle formats and optional rendered video. |
 
+## Project Map
 
-## Project Notes
+```text
+app.py                    Gradio interface
+download_models.py        model downloader
+subtitle_gen/             audio, transcription, subtitle, SDH, burn modules
+docs/                     screenshots and documentation
+requirements.txt          Python dependencies
+```
 
-For important public subtitles, review the generated text and SDH labels before publishing.
+## Notes
 
+Review generated text and SDH labels before publishing important public subtitles.
 
 ## License
 
