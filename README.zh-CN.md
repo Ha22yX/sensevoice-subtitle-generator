@@ -1,11 +1,13 @@
 <div align="center">
   <h1>SenseVoice Subtitle Generator</h1>
-  <p>一个本地字幕生成器，使用 SenseVoice 和 sherpa-onnx 把音视频转换为 SRT/VTT 字幕。</p>
+  <p>一个本地字幕生成工具，可用 SenseVoice 和 sherpa-onnx 把媒体文件转成 SRT/VTT/SDH 字幕。</p>
 
   <p>
     <a href="README.md">English</a>
     &middot;
     <a href="#快速开始">快速开始</a>
+    &middot;
+    <a href="#核心能力">核心能力</a>
     &middot;
     <a href="#技术栈">技术栈</a>
   </p>
@@ -23,30 +25,34 @@
 </p>
 
 <p align="center">
-  <img src="docs/ui.png" alt="SenseVoice Subtitle Generator 界面截图" width="49%" />
-  <img src="docs/sdh_demo.png" alt="SDH 字幕输出截图" width="49%" />
+  <img src="docs/ui.png" alt="SenseVoice Subtitle Generator interface screenshot" width="49%" />
+  <img src="docs/sdh_demo.png" alt="SDH subtitle output screenshot" width="49%" />
 </p>
 
-## 项目价值
+## 项目概览
 
-字幕生成不一定要把每个媒体文件上传到云端。本应用下载本地模型后，即可通过 Gradio 界面生成普通字幕和 SDH 风格字幕。
+字幕生成不应该必须把每个媒体文件上传到云 API。
 
-## 工作流
+这个应用下载一次本地模型后，就可以在 Gradio UI 中生成普通字幕和 SDH 风格字幕。
 
-- 上传音频或视频文件。
-- 通过内置 ffmpeg 路径提取 16 kHz 单声道音频。
-- 使用 VAD 切分语音，并用 SenseVoice 识别片段。
-- 写出 SRT/VTT，并可选生成 SDH/ASS。
-- 可选把字幕烧录进 MP4 用于检查。
+## 核心能力
 
-## 核心功能
+- 从音频/视频文件生成 SRT 和 VTT。
+- 模型下载后本地识别，不需要云端 API Key。
+- 可选 SDH 标签、ASS 输出和字幕烧录路径。
+- 包含模型下载器和 ffmpeg 处理。
+- `docs/` 中保留截图和说明。
 
-- 从媒体文件生成 SRT 和 VTT。
-- 模型下载后本地运行，无需云端 API key。
-- 可选 SDH 标签、ASS 字幕和烧录流程。
-- Gradio 界面封装模型路径和 ffmpeg 处理。
+## 工作方式
+
+1. 在 Gradio 中上传媒体文件。
+2. 通过 ffmpeg 提取 16 kHz 单声道音频。
+3. 使用 VAD 和 SenseVoice 转写带时间轴的片段。
+4. 输出 SRT/VTT/SDH/ASS，并可选烧录到 MP4。
 
 ## 快速开始
+
+可以用下面的命令在本地运行项目。
 
 ```bash
 git clone https://github.com/Ha22yX/sensevoice-subtitle-generator.git
@@ -60,29 +66,38 @@ python app.py
 
 打开 `http://127.0.0.1:7860`。首次模型下载约 1.1 GB。
 
+## 配置项
+
+| 项目 | 作用 |
+| --- | --- |
+| 模型路径 | 由 `download_models.py` 下载；自定义模型不要提交进仓库。 |
+| 线程数 | 应用默认使用较保守的 CPU 线程数。 |
+| 输出目录 | 生成字幕和烧录视频属于运行时输出。 |
+| 人工复核 | 公开发布字幕前应检查识别结果。 |
+
 ## 技术栈
 
 | 层级 | 技术 | 作用 |
 | --- | --- | --- |
-| 语音识别 | SenseVoice via sherpa-onnx | 本地语音识别。 |
+| ASR | SenseVoice via sherpa-onnx | 本地语音识别。 |
 | 音频 | imageio-ffmpeg, VAD | 提取并切分语音片段。 |
-| 界面 | Gradio | 上传文件并导出字幕。 |
-| 输出 | SRT, VTT, ASS, MP4 burn-in | 字幕格式和可选视频烧录。 |
+| UI | Gradio | 上传文件并导出字幕。 |
+| 输出 | SRT, VTT, ASS, MP4 burn-in | 字幕格式和烧录预览视频。 |
 
 ## 项目结构
 
 ```text
-app.py                    Gradio interface
-download_models.py        model downloader
-subtitle_gen/             audio, transcription, subtitle, SDH, burn modules
-docs/                     screenshots and documentation
-requirements.txt          Python dependencies
+app.py                    Gradio 界面
+download_models.py        模型下载器
+subtitle_gen/             音频、转写、字幕、SDH、烧录模块
+docs/                     截图和文档
+requirements.txt          Python 依赖
 ```
 
-## 项目说明
+## 项目状态
 
-用于公开发布的重要字幕，建议人工复核文字和 SDH 标签。
+本地优先的媒体工具。重要场景使用前请人工复核文本和 SDH 标签。
 
-## License
+## 许可证
 
-MIT License. See [LICENSE](LICENSE).
+MIT License。见 [LICENSE](LICENSE)。
